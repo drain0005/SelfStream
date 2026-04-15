@@ -71,8 +71,25 @@ export function decodeProxyToken(token: string): { u: string; h: Record<string, 
         let headers: Record<string, string>;
         if (raw.hid) {
             const cached = lookupHeaders(raw.hid);
-            if (!cached) return null; // headers expired
-            headers = cached;
+            if (!cached) {
+                // Fallback: infer headers from URL when cache is lost (serverless restart)
+                const url = raw.u || '';
+                if (url.includes('vixsrc.to') || url.includes('rabbitstream')) {
+                    headers = { ...VIXSRC_HEADERS };
+                } else if (url.includes('vixcloud') || url.includes('animeunity')) {
+                    headers = { ...VIXCLOUD_HEADERS };
+                } else {
+                    // Generic headers for CinemaCity CDN etc
+                    headers = {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                        'Accept': '*/*',
+                        'Connection': 'keep-alive'
+                    };
+                }
+                console.log(`[Proxy] Header cache miss for ${raw.hid}, using fallback for: ${url.substring(0, 60)}`);
+            } else {
+                headers = cached;
+            }
         } else {
             headers = raw.h || {};
         }
